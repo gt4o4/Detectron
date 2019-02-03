@@ -22,3 +22,9 @@ detectron/datasets/data/*
 
 # Generated C files
 detectron/utils/cython_*.c
+
+# IDE stuff
+.idea/
+
+# Debugging
+test/
