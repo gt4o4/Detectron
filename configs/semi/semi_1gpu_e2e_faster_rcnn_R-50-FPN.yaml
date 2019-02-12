@@ -38,11 +38,7 @@ FAST_RCNN:
   ROI_XFORM_RESOLUTION: 7
   ROI_XFORM_SAMPLING_RATIO: 2
 TRAIN:
-<<<<<<< HEAD
-  WEIGHTS: https://dl.fbaipublicfiles.com/detectron/ImageNetPretrained/MSRA/R-50.pkl
-=======
-  WEIGHTS: /media/data/Research/Detectron/ImageNetPretrained/MSRA/R-50.pkl
->>>>>>> 5f2627f0c4793b8005b04204a2243b0e53a8c416
+  WEIGHTS: train/ImageNetPretrained/MSRA/R-50.pkl
   DATASETS: ('coco_2014_semi',)
   SCALES: (500,)
   MAX_SIZE: 833
