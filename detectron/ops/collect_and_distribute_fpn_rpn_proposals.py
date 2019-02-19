@@ -41,6 +41,7 @@ class CollectAndDistributeFpnRpnProposalsOp(object):
         #  rpn_roi_probs_fpn2, ..., rpn_roi_probs_fpn6]
         # If training with Faster R-CNN, then inputs will additionally include
         #  + [roidb, im_info]
+        import pydevd; pydevd.settrace()
         rois = collect(inputs, self._train)
         if self._train:
             # During training we reuse the data loader code. We populate roidb
