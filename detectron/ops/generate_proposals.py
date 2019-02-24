@@ -57,6 +57,7 @@ class GenerateProposalsOp(object):
         # 7. take after_nms_topN proposals after NMS
         # 8. return the top proposals
 
+        import pydevd; pydevd.settrace(suspend=False)
         # predicted probability of fg object for each RPN anchor
         scores = inputs[0].data
         # predicted achors transformations
