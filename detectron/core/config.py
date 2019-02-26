@@ -194,6 +194,8 @@ __C.TRAIN.COPY_WEIGHTS = False
 # Add StopGrad at a specified stage so the bottom layers are frozen
 __C.TRAIN.FREEZE_AT = 2
 
+# Add Semi training switch
+__C.TRAIN.SEMI = False
 
 # ---------------------------------------------------------------------------- #
 # Data loader options (see detectron/roi_data/loader.py for more info)

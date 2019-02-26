@@ -28,3 +28,4 @@ detectron/utils/cython_*.c
 
 # Debugging
 test/
+train/

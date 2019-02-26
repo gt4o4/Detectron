@@ -112,6 +112,8 @@ def filter_for_training(roidb):
     """Remove roidb entries that have no usable RoIs based on config settings.
     """
     def is_valid(entry):
+        if cfg.TRAIN.SEMI and not entry['has_label']:
+            return True
         # Valid images have:
         #   (1) At least one foreground RoI OR
         #   (2) At least one background RoI
