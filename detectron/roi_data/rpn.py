@@ -95,9 +95,14 @@ def add_rpn_blobs(blobs, im_scales, roidb):
         # Add RPN targets
         if cfg.FPN.FPN_ON and cfg.FPN.MULTILEVEL_RPN:
             # RPN applied to many feature levels, as in the FPN paper
-            rpn_blobs = _get_rpn_blobs(
-                im_height, im_width, foas, all_anchors, gt_rois
-            )
+            if cfg.TRAIN.SEMI and not entry['has_label']:
+                rpn_blobs = _get_rpn_blobs_semi(
+                    im_height, im_width, foas, all_anchors, gt_rois
+                )
+            else:
+                rpn_blobs = _get_rpn_blobs(
+                    im_height, im_width, foas, all_anchors, gt_rois
+                )
             for i, lvl in enumerate(range(k_min, k_max + 1)):
                 for k, v in rpn_blobs[i].items():
                     blobs[k + '_fpn' + str(lvl)].append(v)
@@ -117,6 +122,9 @@ def add_rpn_blobs(blobs, im_scales, roidb):
         'has_visible_keypoints', 'boxes', 'segms', 'seg_areas', 'gt_classes',
         'gt_overlaps', 'is_crowd', 'box_to_gt_ind_map', 'gt_keypoints'
     ]
+    if cfg.TRAIN.SEMI:
+        valid_keys.append('has_label')
+
     minimal_roidb = [{} for _ in range(len(roidb))]
     for i, e in enumerate(roidb):
         for k in valid_keys:
@@ -184,6 +192,8 @@ def _get_rpn_blobs(im_height, im_width, foas, all_anchors, gt_boxes):
         labels[anchors_with_max_overlap] = 1
         # Fg label: above threshold IOU
         labels[anchor_to_gt_max >= cfg.TRAIN.RPN_POSITIVE_OVERLAP] = 1
+    else:
+        assert False, "No ground truth in labeled image"
 
     # subsample positive labels if we have too many
     num_fg = int(cfg.TRAIN.RPN_FG_FRACTION * cfg.TRAIN.RPN_BATCH_SIZE_PER_IM)
@@ -231,6 +241,100 @@ def _get_rpn_blobs(im_height, im_width, foas, all_anchors, gt_boxes):
     num_examples = np.sum(labels >= 0)
     bbox_outside_weights[labels == 1, :] = 1.0 / num_examples
     bbox_outside_weights[labels == 0, :] = 1.0 / num_examples
+
+    # Map up to original set of anchors
+    labels = data_utils.unmap(labels, total_anchors, inds_inside, fill=-1)
+    bbox_targets = data_utils.unmap(
+        bbox_targets, total_anchors, inds_inside, fill=0
+    )
+    bbox_inside_weights = data_utils.unmap(
+        bbox_inside_weights, total_anchors, inds_inside, fill=0
+    )
+    bbox_outside_weights = data_utils.unmap(
+        bbox_outside_weights, total_anchors, inds_inside, fill=0
+    )
+
+    # Split the generated labels, etc. into labels per each field of anchors
+    blobs_out = []
+    start_idx = 0
+    for foa in foas:
+        H = foa.field_size
+        W = foa.field_size
+        A = foa.num_cell_anchors
+        end_idx = start_idx + H * W * A
+        _labels = labels[start_idx:end_idx]
+        _bbox_targets = bbox_targets[start_idx:end_idx, :]
+        _bbox_inside_weights = bbox_inside_weights[start_idx:end_idx, :]
+        _bbox_outside_weights = bbox_outside_weights[start_idx:end_idx, :]
+        start_idx = end_idx
+
+        # labels output with shape (1, A, height, width)
+        _labels = _labels.reshape((1, H, W, A)).transpose(0, 3, 1, 2)
+        # bbox_targets output with shape (1, 4 * A, height, width)
+        _bbox_targets = _bbox_targets.reshape(
+            (1, H, W, A * 4)).transpose(0, 3, 1, 2)
+        # bbox_inside_weights output with shape (1, 4 * A, height, width)
+        _bbox_inside_weights = _bbox_inside_weights.reshape(
+            (1, H, W, A * 4)).transpose(0, 3, 1, 2)
+        # bbox_outside_weights output with shape (1, 4 * A, height, width)
+        _bbox_outside_weights = _bbox_outside_weights.reshape(
+            (1, H, W, A * 4)).transpose(0, 3, 1, 2)
+        blobs_out.append(
+            dict(
+                rpn_labels_int32_wide=_labels,
+                rpn_bbox_targets_wide=_bbox_targets,
+                rpn_bbox_inside_weights_wide=_bbox_inside_weights,
+                rpn_bbox_outside_weights_wide=_bbox_outside_weights
+            )
+        )
+    return blobs_out[0] if len(blobs_out) == 1 else blobs_out
+
+
+def _get_rpn_blobs_semi(im_height, im_width, foas, all_anchors, gt_boxes):
+    total_anchors = all_anchors.shape[0]
+    straddle_thresh = cfg.TRAIN.RPN_STRADDLE_THRESH
+
+    if straddle_thresh >= 0:
+        # Only keep anchors inside the image by a margin of straddle_thresh
+        # Set TRAIN.RPN_STRADDLE_THRESH to -1 (or a large value) to keep all
+        # anchors
+        inds_inside = np.where(
+            (all_anchors[:, 0] >= -straddle_thresh) &
+            (all_anchors[:, 1] >= -straddle_thresh) &
+            (all_anchors[:, 2] < im_width + straddle_thresh) &
+            (all_anchors[:, 3] < im_height + straddle_thresh)
+        )[0]
+        # keep only inside anchors
+        anchors = all_anchors[inds_inside, :]
+    else:
+        inds_inside = np.arange(all_anchors.shape[0])
+        anchors = all_anchors
+    num_inside = len(inds_inside)
+
+    logger.debug('total_anchors: {}'.format(total_anchors))
+    logger.debug('inds_inside: {}'.format(num_inside))
+    logger.debug('anchors.shape: {}'.format(anchors.shape))
+
+    # Compute anchor labels:
+    # label=1 is positive, 0 is negative, -1 is don't care (ignore)
+    labels = np.empty((num_inside, ), dtype=np.int32)
+    labels.fill(-1)
+
+    bbox_targets = np.zeros((num_inside, 4), dtype=np.float32)
+
+    # Bbox regression loss has the form:
+    #   loss(x) = weight_outside * L(weight_inside * x)
+    # Inside weights allow us to set zero loss on an element-wise basis
+    # Bbox regression is only trained on positive examples so we set their
+    # weights to 1.0 (or otherwise if config is different) and 0 otherwise
+    bbox_inside_weights = np.zeros((num_inside, 4), dtype=np.float32)
+
+    # The bbox regression loss only averages by the number of images in the
+    # mini-batch, whereas we need to average by the total number of example
+    # anchors selected
+    # Outside weights are used to scale each element-wise loss so the final
+    # average over the mini-batch is correct
+    bbox_outside_weights = np.zeros((num_inside, 4), dtype=np.float32)
 
     # Map up to original set of anchors
     labels = data_utils.unmap(labels, total_anchors, inds_inside, fill=-1)
