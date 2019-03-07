@@ -23,7 +23,6 @@ import logging
 from detectron.datasets import json_dataset
 from detectron.datasets import roidb as roidb_utils
 from detectron.utils import blob as blob_utils
-import detectron.roi_data.fast_rcnn as fast_rcnn_roi_data
 import numpy as np
 
 logger = logging.getLogger(__name__)
@@ -42,11 +41,10 @@ class UpdateSemiLabelsOp(object):
         roidb = blob_utils.deserialize(inputs[0].data)
         im_info = inputs[1].data
         im_scales = im_info[:, 2]
-        output_blob_names = fast_rcnn_roi_data.get_fast_rcnn_blob_names()
         # For historical consistency with the original Faster R-CNN
         # implementation we are *not* filtering crowd proposals.
         # This choice should be investigated in the future (it likely does
         # not matter).
-        has_label = [1 if entry['has_label'] else 0 for entry in roidb]
-        blob_out = np.asarray(has_label, dtype=np.int32)
+        has_label = [entry['has_label'] for entry in roidb]
+        blob_out = np.asarray(has_label, dtype=np.float32)
         blob_utils.py_op_copy_blob(blob_out, outputs[0])

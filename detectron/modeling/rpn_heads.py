@@ -24,7 +24,6 @@ from detectron.utils.c2 import const_fill
 from detectron.utils.c2 import gauss_fill
 import detectron.modeling.FPN as FPN
 import detectron.utils.blob as blob_utils
-import detectron.modeling.semi as semi
 
 # ---------------------------------------------------------------------------- #
 # RPN and Faster R-CNN outputs and losses
@@ -44,8 +43,9 @@ def add_generic_rpn_outputs(model, blob_in, dim_in, spatial_scale_in):
             model.CollectAndDistributeFpnRpnProposals()
         if model.train:
             if cfg.TRAIN.SEMI:
-                semi.add_semi_update_op(model)
-            loss_gradients = FPN.add_fpn_rpn_losses(model)
+                loss_gradients = FPN.add_fpn_rpn_semilosses(model)
+            else:
+                loss_gradients = FPN.add_fpn_rpn_losses(model)
     else:
         # Not using FPN, add RPN to a single scale
         add_single_scale_rpn_outputs(model, blob_in, dim_in, spatial_scale_in)

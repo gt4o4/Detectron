@@ -29,6 +29,7 @@ from detectron.utils.c2 import const_fill
 from detectron.utils.c2 import gauss_fill
 from detectron.utils.net import get_group_gn
 import detectron.modeling.ResNet as ResNet
+import detectron.modeling.semi as semi
 import detectron.utils.blob as blob_utils
 import detectron.utils.boxes as box_utils
 
@@ -468,6 +469,62 @@ def add_fpn_rpn_losses(model):
         # Normalization by (1) RPN_BATCH_SIZE_PER_IM and (2) IMS_PER_BATCH is
         # handled by (1) setting bbox outside weights and (2) SmoothL1Loss
         # normalizes by IMS_PER_BATCH
+        loss_rpn_bbox_fpn = model.net.SmoothL1Loss(
+            [
+                'rpn_bbox_pred_fpn' + slvl, 'rpn_bbox_targets_fpn' + slvl,
+                'rpn_bbox_inside_weights_fpn' + slvl,
+                'rpn_bbox_outside_weights_fpn' + slvl
+            ],
+            'loss_rpn_bbox_fpn' + slvl,
+            beta=1. / 9.,
+            scale=model.GetLossScale(),
+        )
+        loss_gradients.update(
+            blob_utils.
+            get_loss_gradients(model, [loss_rpn_cls_fpn, loss_rpn_bbox_fpn])
+        )
+        model.AddLosses(['loss_rpn_cls_fpn' + slvl, 'loss_rpn_bbox_fpn' + slvl])
+    return loss_gradients
+
+
+def add_fpn_rpn_semilosses(model):
+    """Add RPN on FPN specific losses."""
+    semi.add_semi_update_op(model)
+    loss_gradients = {}
+    for lvl in range(cfg.FPN.RPN_MIN_LEVEL, cfg.FPN.RPN_MAX_LEVEL + 1):
+        slvl = str(lvl)
+        # Spatially narrow the full-sized RPN label arrays to match the feature map
+        # shape
+        model.net.SpatialNarrowAs(
+            ['rpn_labels_int32_wide_fpn' + slvl, 'rpn_cls_logits_fpn' + slvl],
+            'rpn_labels_int32_fpn' + slvl
+        )
+        for key in ('targets', 'inside_weights', 'outside_weights'):
+            model.net.SpatialNarrowAs(
+                [
+                    'rpn_bbox_' + key + '_wide_fpn' + slvl,
+                    'rpn_bbox_pred_fpn' + slvl
+                ],
+                'rpn_bbox_' + key + '_fpn' + slvl
+            )
+        loss_rpn_cls_fpn = model.net.SigmoidCrossEntropyLoss(
+            ['rpn_cls_logits_fpn' + slvl, 'rpn_labels_int32_fpn' + slvl],
+            'loss_rpn_cls_fpn' + slvl,
+            normalize=0,
+            scale=(
+                model.GetLossScale() / cfg.TRAIN.RPN_BATCH_SIZE_PER_IM /
+                cfg.TRAIN.IMS_PER_BATCH
+            )
+        )
+        # Normalization by (1) RPN_BATCH_SIZE_PER_IM and (2) IMS_PER_BATCH is
+        # handled by (1) setting bbox outside weights and (2) SmoothL1Loss
+        # normalizes by IMS_PER_BATCH
+        model.net.Mul(['rpn_bbox_inside_weights_fpn' + slvl, 'has_label'],
+                  'rpn_bbox_inside_weights_fpn' + slvl,
+                  broadcast=1, axis=0)
+        model.net.Mul(['rpn_bbox_outside_weights_fpn' + slvl, 'has_label'],
+                  'rpn_bbox_outside_weights_fpn' + slvl,
+                  broadcast=1, axis=0)
         loss_rpn_bbox_fpn = model.net.SmoothL1Loss(
             [
                 'rpn_bbox_pred_fpn' + slvl, 'rpn_bbox_targets_fpn' + slvl,
