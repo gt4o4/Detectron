@@ -26,11 +26,13 @@ from detectron.datasets import roidb as roidb_utils
 import detectron.modeling.FPN as fpn
 import detectron.roi_data.fast_rcnn as fast_rcnn_roi_data
 import detectron.utils.blob as blob_utils
+import detectron.utils.debugging as dbg
 
 
 class CollectAndDistributeFpnRpnProposalsOp(object):
     def __init__(self, train):
         self._train = train
+        self._is_debugging = dbg.is_debugging()
 
     def forward(self, inputs, outputs):
         """See modeling.detector.CollectAndDistributeFpnRpnProposals for
@@ -41,7 +43,10 @@ class CollectAndDistributeFpnRpnProposalsOp(object):
         #  rpn_roi_probs_fpn2, ..., rpn_roi_probs_fpn6]
         # If training with Faster R-CNN, then inputs will additionally include
         #  + [roidb, im_info]
-        import pydevd; pydevd.settrace(suspend=False)
+
+        if self._is_debugging:
+            dbg.settrace()
+
         rois = collect(inputs, self._train)
         if self._train:
             # During training we reuse the data loader code. We populate roidb

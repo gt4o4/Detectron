@@ -25,6 +25,7 @@ import numpy as np
 
 from detectron.core.config import cfg
 import detectron.utils.boxes as box_utils
+import detectron.utils.debugging as dbg
 
 
 class GenerateProposalsOp(object):
@@ -41,6 +42,7 @@ class GenerateProposalsOp(object):
         self._feat_stride = 1. / spatial_scale
         self._train = train
         self._reg_weights = reg_weights
+        self._is_debugging = dbg.is_debugging()
 
     def forward(self, inputs, outputs):
         """See modeling.detector.GenerateProposals for inputs/outputs
@@ -57,7 +59,9 @@ class GenerateProposalsOp(object):
         # 7. take after_nms_topN proposals after NMS
         # 8. return the top proposals
 
-        import pydevd; pydevd.settrace(suspend=False)
+        if self._is_debugging:
+            dbg.settrace()
+
         # predicted probability of fg object for each RPN anchor
         scores = inputs[0].data
         # predicted achors transformations

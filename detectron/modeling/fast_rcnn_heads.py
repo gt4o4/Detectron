@@ -75,7 +75,8 @@ def add_fast_rcnn_outputs(model, blob_in, dim):
 def add_fast_rcnn_losses(model):
     """Add losses for RoI classification and bounding box regression."""
     cls_prob, loss_cls = model.net.SoftmaxWithLoss(
-        ['cls_score', 'labels_int32'], ['cls_prob', 'loss_cls'],
+        ['cls_score', 'labels_int32', 'labels_weights'],
+        ['cls_prob', 'loss_cls'],
         scale=model.GetLossScale()
     )
     loss_bbox = model.net.SmoothL1Loss(
