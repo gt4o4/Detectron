@@ -44,6 +44,7 @@ import detectron.utils.env as envu
 import detectron.utils.net as net_utils
 import detectron.utils.subprocess as subprocess_utils
 import detectron.utils.vis as vis_utils
+import detectron.utils.debugging as dbg
 
 logger = logging.getLogger(__name__)
 
@@ -252,10 +253,17 @@ def test_net(
             box_proposals = None
 
         im = cv2.imread(entry['image'])
+        im_name = os.path.splitext(os.path.basename(entry['image']))[0]
         with c2_utils.NamedCudaScope(gpu_id):
             cls_boxes_i, cls_segms_i, cls_keyps_i = im_detect_all(
                 model, im, box_proposals, timers
             )
+            dump_vars = locals()
+            dump_names = str('im_name cls_boxes_i cls_segms_i cls_keyps_i')
+            dbg.dump_model(model, ['rois'],
+                           '{:d}_{:s}'.format(i, im_name),
+                           os.path.join(output_dir, 'dbg'),
+                           **{k: dump_vars[k] for k in dump_names.split()})
 
         extend_results(i, all_boxes, cls_boxes_i)
         if cls_segms_i is not None:
@@ -288,7 +296,6 @@ def test_net(
             )
 
         if cfg.VIS:
-            im_name = os.path.splitext(os.path.basename(entry['image']))[0]
             vis_utils.vis_one_image(
                 im[:, :, ::-1],
                 '{:d}_{:s}'.format(i, im_name),
