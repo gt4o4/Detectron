@@ -29,7 +29,7 @@ import detectron.roi_data.fast_rcnn as fast_rcnn_roi_data
 logger = logging.getLogger(__name__)
 
 
-class GenerateProposalLabelsOp(object):
+class GenerateProposalLabelsOp:
 
     def __init__(self):
         self._is_debugging = dbg.is_debugging()

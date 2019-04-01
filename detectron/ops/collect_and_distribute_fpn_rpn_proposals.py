@@ -29,7 +29,7 @@ import detectron.utils.blob as blob_utils
 import detectron.utils.debugging as dbg
 
 
-class CollectAndDistributeFpnRpnProposalsOp(object):
+class CollectAndDistributeFpnRpnProposalsOp:
     def __init__(self, train):
         self._train = train
         self._is_debugging = dbg.is_debugging()

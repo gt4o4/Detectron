@@ -48,7 +48,7 @@ import detectron.utils.segms as segm_utils
 logger = logging.getLogger(__name__)
 
 
-class JsonDataset(object):
+class JsonDataset:
     """A class representing a COCO json dataset."""
 
     def __init__(self, name):
@@ -145,7 +145,7 @@ class JsonDataset(object):
         entry['gt_overlaps'] = scipy.sparse.csr_matrix(
             np.empty((0, self.num_classes), dtype=np.float32)
         )
-        entry['is_crowd'] = np.empty((0), dtype=np.bool)
+        entry['is_crowd'] = np.empty((0), dtype=bool)
         # 'box_to_gt_ind_map': Shape is (#rois). Maps from each roi to the index
         # in the list of rois that satisfy np.where(entry['gt_classes'] > 0)
         entry['box_to_gt_ind_map'] = np.empty((0), dtype=np.int32)
@@ -229,7 +229,7 @@ class JsonDataset(object):
         entry['segms'].extend(valid_segms)
         # To match the original implementation:
         # entry['boxes'] = np.append(
-        #     entry['boxes'], boxes.astype(np.int).astype(np.float), axis=0)
+        #     entry['boxes'], boxes.astype(int).astype(float), axis=0)
         entry['gt_classes'] = np.append(entry['gt_classes'], gt_classes)
         entry['seg_areas'] = np.append(entry['seg_areas'], seg_areas)
         entry['gt_overlaps'] = np.append(
@@ -254,6 +254,8 @@ class JsonDataset(object):
         proposals = load_object(proposal_file)
 
         id_field = 'indexes' if 'indexes' in proposals else 'ids'  # compat fix
+
+        _remove_proposals_not_in_roidb(proposals, roidb, id_field)
         _sort_proposals(proposals, id_field)
         box_list = []
         for i, entry in enumerate(roidb):
@@ -453,3 +455,11 @@ def _sort_proposals(proposals, id_field):
     fields_to_sort = ['boxes', id_field, 'scores']
     for k in fields_to_sort:
         proposals[k] = [proposals[k][i] for i in order]
+
+
+def _remove_proposals_not_in_roidb(proposals, roidb, id_field):
+    # fix proposals so they don't contain entries for images not in the roidb
+    roidb_ids = set({entry["id"] for entry in roidb})
+    keep = [i for i, id in enumerate(proposals[id_field]) if id in roidb_ids]
+    for f in ['boxes', id_field, 'scores']:
+        proposals[f] = [proposals[f][i] for i in keep]

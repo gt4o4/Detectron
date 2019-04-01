@@ -116,9 +116,9 @@ __C.TRAIN.USE_FLIPPED = True
 __C.TRAIN.BBOX_THRESH = 0.5
 
 # Snapshot (model checkpoint) period
-# Divide by NUM_GPUS to determine actual period (e.g., 20000/8 => 2500 iters)
+# Divide by NUM_GPUS to determine actual period (e.g., 80000/8 => 10000 iters)
 # to allow for linear training schedule scaling
-__C.TRAIN.SNAPSHOT_ITERS = 20000
+__C.TRAIN.SNAPSHOT_ITERS = 80000
 
 # Train using these proposals
 # During training, all proposals specified in the file are used (no limit is
@@ -136,6 +136,9 @@ __C.TRAIN.ASPECT_GROUPING = True
 # ---------------------------------------------------------------------------- #
 # RPN training options
 # ---------------------------------------------------------------------------- #
+
+# Run GenerateProposals on GPU if set to True
+__C.TRAIN.GENERATE_PROPOSALS_ON_GPU = False
 
 # Minimum overlap required between an anchor and ground-truth box for the
 # (anchor, gt box) pair to be a positive example (IOU >= thresh ==> positive RPN
@@ -243,6 +246,9 @@ __C.TEST.BBOX_REG = True
 # Test using these proposal files (must correspond with TEST.DATASETS)
 __C.TEST.PROPOSAL_FILES = ()
 
+# Run GenerateProposals on GPU if set to True
+__C.TEST.GENERATE_PROPOSALS_ON_GPU = False
+
 # Limit on the number of proposals per image used during inference
 __C.TEST.PROPOSAL_LIMIT = 2000
 
@@ -286,6 +292,11 @@ __C.TEST.FORCE_JSON_DATASET_EVAL = False
 # Not set for 1-stage models and 2-stage models with RPN subnetwork enabled
 __C.TEST.PRECOMPUTED_PROPOSALS = True
 
+# Evaluate proposals in class-specific Average Recall (AR).
+# It means that one first computes AR within each category and then averages
+# over the categories. It is not biased towards the AR of frequent categories
+# compared with class-agnostic AR.
+__C.TEST.CLASS_SPECIFIC_AR = False
 
 # ---------------------------------------------------------------------------- #
 # Test-time augmentations for bounding box detection
@@ -583,9 +594,15 @@ __C.SOLVER.LR_POLICY = 'step'
 #   SOLVER.STEPS = [0, 60000, 80000]
 #   SOLVER.LRS = [0.02, 0.002, 0.0002]
 #   lr = LRS[current_step]
+# 'cosine_decay'
+#   lr = SOLVER.BASE_LR * (cos(PI * cur_iter / SOLVER.MAX_ITER) * 0.5 + 0.5)
+# 'exp_decay'
+#   lr smoothly decays from SOLVER.BASE_LR to SOLVER.GAMMA * SOLVER.BASE_LR
+#   lr = SOLVER.BASE_LR * exp(np.log(SOLVER.GAMMA) * cur_iter / SOLVER.MAX_ITER)
 
 # Hyperparameter used by the specified policy
 # For 'step', the current LR is multiplied by SOLVER.GAMMA at each step
+# For 'exp_decay', SOLVER.GAMMA is the ratio between the final and initial LR.
 __C.SOLVER.GAMMA = 0.1
 
 # Uniform step size for 'steps' policy

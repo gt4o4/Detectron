@@ -28,7 +28,7 @@ import detectron.utils.boxes as box_utils
 import detectron.utils.debugging as dbg
 
 
-class GenerateProposalsOp(object):
+class GenerateProposalsOp:
     """Output object detection proposals by applying estimated bounding-box
     transformations to a set of regular boxes (called "anchors").
 
