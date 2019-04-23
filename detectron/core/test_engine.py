@@ -260,7 +260,7 @@ def test_net(
             )
             dump_vars = locals()
             dump_names = str('im_name cls_boxes_i cls_segms_i cls_keyps_i')
-            dbg.dump_model(model, ['rois'],
+            dbg.dump_model(model, ['im_info', 'rois'],
                            '{:d}_{:s}'.format(i, im_name),
                            os.path.join(output_dir, 'dbg'),
                            **{k: dump_vars[k] for k in dump_names.split()})

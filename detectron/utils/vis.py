@@ -129,13 +129,13 @@ def vis_class(img, pos, class_str, font_scale=0.35):
     return img
 
 
-def vis_bbox(img, bbox, thick=1):
+def vis_bbox(img, bbox, thick=1, color=_GREEN):
     """Visualizes a bounding box."""
     img = img.astype(np.uint8)
     (x0, y0, w, h) = bbox
     x1, y1 = int(x0 + w), int(y0 + h)
     x0, y0 = int(x0), int(y0)
-    cv2.rectangle(img, (x0, y0), (x1, y1), _GREEN, thickness=thick)
+    cv2.rectangle(img, (x0, y0), (x1, y1), color, thickness=thick)
     return img
 
 
